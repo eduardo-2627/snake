@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a202c; /* Tailwind gray-900 */
+            color: #e2e8f0; /* Tailwind gray-200 */
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            background-color: #2d3748; /* Tailwind gray-800 */
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .stat-box {
+            background-color: #4a5568; /* Tailwind gray-700 */
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        canvas {
+            background-color: #000;
+            border: 2px solid #4a5568;
+            border-radius: 0.25rem;
+            display: block;
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+            z-index: 10;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        button {
+            background-color: #3b82f6; /* Tailwind blue-500 */
+            color: white;
+            font-weight: bold;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: background-color 0.2s;
+            font-size: 1.125rem;
+        }
+
+        button:hover {
+            background-color: #2563eb; /* Tailwind blue-600 */
+        }
+        
+        .title-text {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #4ade80; /* Tailwind green-400 */
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle-text {
+            font-size: 1.25rem;
+            color: #cbd5e1;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        
+        <!-- Header for Stats -->
+        <div id="header">
+            <div class="stat-box text-red-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-heart"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                <span id="lives-display">3</span>
+            </div>
+            <div class="stat-box text-blue-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span id="timer-display">05:00</span>
+            </div>
+            <div class="stat-box text-green-400">
+                <span id="score-display">0</span> pts
+            </div>
+        </div>
+
+        <!-- The Game Canvas -->
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <!-- Screens -->
+        <div id="start-screen" class="overlay">
+            <h1 class="title-text">Snake</h1>
+            <p class="subtitle-text">Sobrevive 5 minutos.<br>Usa las flechas para moverte.</p>
+            <button id="start-btn">Iniciar Juego</button>
+        </div>
+
+        <div id="game-over-screen" class="overlay hidden">
+            <h1 class="title-text text-red-500">Game Over</h1>
+            <p id="final-score-msg" class="subtitle-text">Te quedaste sin vidas.</p>
+            <button id="restart-btn">Intentar de Nuevo</button>
+        </div>
+
+        <div id="win-screen" class="overlay hidden">
+            <h1 class="title-text text-yellow-400">¡Ganaste!</h1>
+            <p class="subtitle-text">Has sobrevivido 5 minutos.</p>
+            <p id="win-score-msg" class="subtitle-text font-bold"></p>
+            <button id="play-again-btn">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const livesDisplay = document.getElementById('lives-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const scoreDisplay = document.getElementById('score-display');
+        
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const winScreen = document.getElementById('win-screen');
+        
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const finalScoreMsg = document.getElementById('final-score-msg');
+        const winScoreMsg = document.getElementById('win-score-msg');
+
+        // Game Configuration
+        const gridSize = 20;
+        let tileCountX = canvas.width / gridSize;
+        let tileCountY = canvas.height / gridSize;
+        
+        // Adjust for responsive canvas if needed later, 
+        // for now keeping logic tied to fixed canvas size but CSS scales it.
+        
+        let snake = [];
+        let snakeLength = 4;
+        let headX = 10;
+        let headY = 10;
+        
+        // Velocity (Direction)
+        let xVelocity = 0;
+        let yVelocity = 0;
+        let nextXVelocity = 0;
+        let nextYVelocity = 0;
+        
+        // Food
+        let appleX = 5;
+        let appleY = 5;
+        
+        // Game State
+        let score = 0;
+        let lives = 3;
+        const totalGameTime = 5 * 60; // 5 minutes in seconds
+        let timeRemaining = totalGameTime;
+        
+        let gameLoopInterval;
+        let timerInterval;
+        let isGameRunning = false;
+        
+        const baseSpeed = 10; // Frames per second
+        
+        // Listeners for buttons
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', resetGame);
+        playAgainBtn.addEventListener('click', resetGame);
+        
+        // Keyboard controls
+        document.body.addEventListener('keydown', handleKeyDown);
+
+        function handleKeyDown(event) {
+            // Prevent default scrolling for arrow keys
+            if([37, 38, 39, 40].indexOf(event.keyCode) > -1) {
+                event.preventDefault();
+            }
+
+            if (!isGameRunning) return;
+
+            // Update next velocity to prevent snake from reversing into itself
+            if (event.keyCode == 38 && yVelocity !== 1) { // Up
+                nextXVelocity = 0;
+                nextYVelocity = -1;
+            }
+            if (event.keyCode == 40 && yVelocity !== -1) { // Down
+                nextXVelocity = 0;
+                nextYVelocity = 1;
+            }
+            if (event.keyCode == 37 && xVelocity !== 1) { // Left
+                nextXVelocity = -1;
+                nextYVelocity = 0;
+            }
+            if (event.keyCode == 39 && xVelocity !== -1) { // Right
+                nextXVelocity = 1;
+                nextYVelocity = 0;
+            }
+        }
+
+        function startGame() {
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            winScreen.classList.add('hidden');
+            
+            initGameState();
+            
+            isGameRunning = true;
+            // Kickstart movement to the right
+            nextXVelocity = 1;
+            nextYVelocity = 0;
+            
+            // Start loops
+            gameLoopInterval = setInterval(drawGame, 1000 / baseSpeed);
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            updateUI();
+        }
+
+        function resetGame() {
+            // Reset main variables
+            lives = 3;
+            score = 0;
+            timeRemaining = totalGameTime;
+            
+            startGame();
+        }
+
+        function initGameState() {
+            // Place snake in middle
+            headX = Math.floor(tileCountX / 2);
+            headY = Math.floor(tileCountY / 2);
+            snake = [];
+            snakeLength = 4;
+            
+            xVelocity = 0;
+            yVelocity = 0;
+            nextXVelocity = 0;
+            nextYVelocity = 0;
+            
+            spawnApple();
+        }
+
+        function updateTimer() {
+            if (!isGameRunning) return;
+            
+            timeRemaining--;
+            updateUI();
+            
+            if (timeRemaining <= 0) {
+                gameWon();
+            }
+        }
+
+        function drawGame() {
+            clearScreen();
+            
+            // Apply next velocity only once per frame
+            xVelocity = nextXVelocity;
+            yVelocity = nextYVelocity;
+            
+            changeSnakePosition();
+            
+            let result = isGameOver();
+            if (result) {
+                handleLifeLost();
+                return; // Stop drawing this frame
+            }
+            
+            checkAppleCollision();
+            drawApple();
+            drawSnake();
+        }
+
+        function clearScreen() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawSnake() {
+            // Add current head to snake array
+            snake.push({ x: headX, y: headY });
+            
+            // Keep snake length consistent
+            while (snake.length > snakeLength) {
+                snake.shift();
+            }
+            
+            // Draw body
+            ctx.fillStyle = '#4ade80'; // Tailwind green-400
+            for (let i = 0; i < snake.length; i++) {
+                let part = snake[i];
+                // Make the head slightly different color
+                if(i === snake.length - 1) {
+                    ctx.fillStyle = '#22c55e'; // Tailwind green-500
+                } else {
+                    ctx.fillStyle = '#4ade80';
+                }
+                
+                // Draw slightly smaller than grid for cell separation effect
+                ctx.fillRect(part.x * gridSize + 1, part.y * gridSize + 1, gridSize - 2, gridSize - 2);
+            }
+        }
+
+        function changeSnakePosition() {
+            headX = headX + xVelocity;
+            headY = headY + yVelocity;
+        }
+
+        function drawApple() {
+            ctx.fillStyle = '#ef4444'; // Tailwind red-500
+            // Draw apple slightly smaller than grid
+            ctx.beginPath();
+            let radius = (gridSize / 2) - 2;
+            let centerX = (appleX * gridSize) + (gridSize / 2);
+            let centerY = (appleY * gridSize) + (gridSize / 2);
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function checkAppleCollision() {
+            if (appleX === headX && appleY === headY) {
+                spawnApple();
+                snakeLength++;
+                score += 10;
+                updateUI();
+            }
+        }
+
+        function spawnApple() {
+            let validPosition = false;
+            while (!validPosition) {
+                appleX = Math.floor(Math.random() * tileCountX);
+                appleY = Math.floor(Math.random() * tileCountY);
+                
+                validPosition = true;
+                // Check if apple spawned on snake
+                for (let i = 0; i < snake.length; i++) {
+                    if (snake[i].x === appleX && snake[i].y === appleY) {
+                        validPosition = false;
+                        break;
+                    }
+                }
+                // Check if spawned on head
+                if(appleX === headX && appleY === headY) validPosition = false;
+            }
+        }
+
+        function isGameOver() {
+            let gameOver = false;
+
+            // Check walls
+            if (headX < 0 || headX >= tileCountX || headY < 0 || headY >= tileCountY) {
+                gameOver = true;
+            }
+
+            // Check self collision (only if moving)
+            if (xVelocity !== 0 || yVelocity !== 0) {
+                for (let i = 0; i < snake.length; i++) {
+                    let part = snake[i];
+                    if (part.x === headX && part.y === headY) {
+                        gameOver = true;
+                        break;
+                    }
+                }
+            }
+
+            return gameOver;
+        }
+
+        function handleLifeLost() {
+            lives--;
+            updateUI();
+            
+            // Stop current movement
+            xVelocity = 0;
+            yVelocity = 0;
+            nextXVelocity = 0;
+            nextYVelocity = 0;
+            
+            if (lives <= 0) {
+                gameLost();
+            } else {
+                // Visual feedback for dying (flash red)
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Briefly pause before respawning snake
+                isGameRunning = false;
+                clearInterval(gameLoopInterval);
+                
+                setTimeout(() => {
+                    if(lives > 0) {
+                        initGameState(); // Reset position and length
+                        isGameRunning = true;
+                        gameLoopInterval = setInterval(drawGame, 1000 / baseSpeed);
+                    }
+                }, 1000);
+            }
+        }
+
+        function gameLost() {
+            isGameRunning = false;
+            clearInterval(gameLoopInterval);
+            clearInterval(timerInterval);
+            
+            finalScoreMsg.innerHTML = `Puntuación: <strong>${score}</strong><br>Tiempo restante: ${formatTime(timeRemaining)}`;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function gameWon() {
+            isGameRunning = false;
+            clearInterval(gameLoopInterval);
+            clearInterval(timerInterval);
+            
+            winScoreMsg.innerHTML = `Puntuación Final: ${score}`;
+            winScreen.classList.remove('hidden');
+        }
+
+        function updateUI() {
+            livesDisplay.innerText = lives;
+            scoreDisplay.innerText = score;
+            timerDisplay.innerText = formatTime(timeRemaining);
+        }
+
+        function formatTime(seconds) {
+            let m = Math.floor(seconds / 60);
+            let s = seconds % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+        
+        // Initial setup
+        updateUI();
+
+    </script>
+</body>
+</html>
